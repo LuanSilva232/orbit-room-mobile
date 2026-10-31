@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
+import { Capacitor } from '@capacitor/core'
+
+// DEFINA AQUI A URL REAL DA SUA HOSPEDAGEM NA VERCEL
+const API_URL = 'https://vercel.app'
 
 const ERROR_MESSAGES: Record<string, string> = {
   GOOGLE_NOT_CONFIGURED:
@@ -30,28 +35,79 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
 
+  // Inicializa o plugin do Google se estiver rodando no celular
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize({
+        clientId: 'SEU_CLIENT_ID_DO_GOOGLE_://googleusercontent.com',
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      })
+    }
+  }, [])
+
   useEffect(() => {
     const e = new URLSearchParams(window.location.search).get('error')
     if (e) setError(e)
   }, [])
 
+  // Verifica se o usuário já está logado buscando da API na Vercel
   useEffect(() => {
     let cancelled = false
-    fetch('/api/auth/me')
+    
+    fetch(`${API_URL}/api/auth/me`, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
       .then((r) => r.json())
       .then((d) => {
         if (!cancelled && d?.user) router.replace('/')
       })
+      .catch(() => {
+        console.log('Usuário não logado na nuvem.')
+      })
       .finally(() => {
         if (!cancelled) setChecking(false)
       })
-    return () => {
-      cancelled = true
-    }
+      return () => {
+        cancelled = true
+      }
   }, [router])
 
-  const startLogin = () => {
-    window.location.assign('/api/auth/login?next=/')
+  // Lógica do Clique de Login adaptada para Celular e Web
+  const startLogin = async () => {
+    setError(null)
+
+    if (Capacitor.isNativePlatform()) {
+      // --- MODO CELULAR NATIVO ---
+      try {
+        setChecking(true)
+        const googleUser = await GoogleAuth.signIn()
+        
+        // Envia o token que o celular pegou para validar no seu servidor da Vercel
+        const response = await fetch(`${API_URL}/api/auth/mobile-callback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: googleUser.authentication.idToken }),
+        })
+
+        const data = await response.json()
+        if (data?.user) {
+          router.replace('/')
+        } else {
+          setError('TOKEN_EXCHANGE_FAILED')
+        }
+      } catch (err) {
+        console.error(err)
+        setError('INVALID_CALLBACK')
+      } finally {
+        setChecking(false)
+      }
+    } else {
+      // --- MODO NAVEGADOR WEB PADRÃO ---
+      window.location.assign(`${API_URL}/api/auth/login?next=/`)
+    }
   }
 
   return (
