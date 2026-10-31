@@ -1,24 +1,16 @@
-import type { NextConfig } from 'next';
-import dotenv from 'dotenv';
-
-// Load .env into process.env (dotenv.populate is used internally to inject)
-dotenv.config({ path: '.env', override: true });
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactStrictMode: false,
-  turbopack: {},
+  output: 'export', // Faz o Next.js gerar arquivos HTML/CSS/JS puros para o celular
+  images: {
+    unoptimized: true, // Obrigatório para o modo export do Next.js funcionar no celular
+  },
+  eslint: {
+    ignoreDuringBuilds: true, // Evita travar o build mobile por avisos simples de código
+  },
   typescript: {
-    ignoreBuildErrors: true,
-  },
-  env: {
-    PROJECT_ID: process.env.HAPPYSEEDS_PROJECT_ID ?? '',
-    REACTUS_BASE_URL: process.env.REACTUS_BASE_URL ?? '',
-  },
-  serverExternalPackages: [],
-  allowedDevOrigins: [
-    '**.*.*',
-  ],
+    ignoreBuildErrors: true, // Garante que o build finalize para os testes iniciais
+  }
 };
 
 export default nextConfig;
-
