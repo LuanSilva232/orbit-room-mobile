@@ -35,16 +35,17 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
 
-  // Inicializa o plugin do Google se estiver rodando no celular
+    // Inicializa o plugin do Google se estiver rodando no celular
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       GoogleAuth.initialize({
-        clientId: 'SEU_CLIENT_ID_DO_GOOGLE_://googleusercontent.com',
+        clientId: '832582713946-2qlriqh7h1dph50ev0t54i6sth23a3od.apps.googleusercontent.com',
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       })
     }
   }, [])
+
 
   useEffect(() => {
     const e = new URLSearchParams(window.location.search).get('error')
