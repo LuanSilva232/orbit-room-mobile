@@ -6,12 +6,10 @@ import { useRouter } from 'next/navigation'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 import { Capacitor } from '@capacitor/core'
 
-// DEFINA AQUI A URL REAL DA SUA HOSPEDAGEM NA VERCEL
 const API_URL = 'https://vercel.app'
 
 const ERROR_MESSAGES: Record<string, string> = {
-  GOOGLE_NOT_CONFIGURED:
-    'O login com Google ainda não foi configurado neste app. Peça ao dono para adicionar as chaves do Google.',
+  GOOGLE_NOT_CONFIGURED: 'O login com Google ainda não foi configurado neste app.',
   INVALID_STATE: 'Sua solicitação de login expirou. Clique novamente para entrar.',
   INVALID_CALLBACK: 'A resposta do Google veio incompleta. Tente novamente.',
   TOKEN_EXCHANGE_FAILED: 'O Google não confirmou seu login. Tente novamente.',
@@ -35,97 +33,72 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
 
-    // Inicializa o plugin do Google se estiver rodando no celular
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       GoogleAuth.initialize({
-        clientId: '832582713946-2qlriqh7h1dph50ev0t54i6sth23a3od.apps.googleusercontent.com',
+        clientId: '://googleusercontent.com',
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       })
     }
   }, [])
 
-
-  useEffect(() => {
-    const e = new URLSearchParams(window.location.search).get('error')
-    if (e) setError(e)
-  }, [])
-
-  // Verifica se o usuário já está logado buscando da API na Vercel
   useEffect(() => {
     let cancelled = false
-    
-    fetch(`${API_URL}/api/auth/me`, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
+    fetch(`${API_URL}/api/auth/me`)
       .then((r) => r.json())
       .then((d) => {
         if (!cancelled && d?.user) router.replace('/')
       })
-      .catch(() => {
-        console.log('Usuário não logado na nuvem.')
-      })
+      .catch(() => console.log('Não logado'))
       .finally(() => {
         if (!cancelled) setChecking(false)
       })
-      return () => {
-        cancelled = true
-      }
+    return () => { cancelled = true }
   }, [router])
 
-    // Lógica do Clique de Login adaptada para Celular e Web
-  const startLogin = async () => {
-    setError(null)
+  const handleGoogleLogin = async (e: any) => {
+    // BLOQUEIA TOTALMENTE qualquer refresh ou ação padrão do HTML
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
 
-    // FORÇA O MODO MOBILE SE O NAVEGADOR ESTIVER RODANDO DENTRO DO APP (Sem URL visível)
-    const isMobileApp = Capacitor.isNativePlatform() || 
-                        (typeof window !== 'undefined' && window.location.protocol === 'http:');
+    setError(null);
 
-    if (isMobileApp) {
-      // --- MODO CELULAR NATIVO FORÇADO ---
+    if (Capacitor.isNativePlatform()) {
       try {
-        setChecking(true)
-        console.log('Iniciando Login Nativo do Google...');
-        const googleUser = await GoogleAuth.signIn()
+        setChecking(true);
+        const googleUser = await GoogleAuth.signIn();
         
-        // Envia o token para a sua API oficial na Vercel
         const response = await fetch(`${API_URL}/api/auth/mobile-callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token: googleUser.authentication.idToken }),
-        })
+        });
 
-        const data = await response.json()
+        const data = await response.json();
         if (data?.user) {
-          router.replace('/')
+          router.replace('/');
         } else {
-          setError('TOKEN_EXCHANGE_FAILED')
+          setError('TOKEN_EXCHANGE_FAILED');
         }
       } catch (err) {
-        console.error('Erro no login nativo:', err)
-        setError('INVALID_CALLBACK')
+        console.error(err);
+        setError('INVALID_CALLBACK');
       } finally {
-        setChecking(false)
+        setChecking(false);
       }
     } else {
-      // --- MODO NAVEGADOR WEB PADRÃO ---
-      window.location.assign(`${API_URL}/api/auth/login?next=/`)
+      window.location.assign(`${API_URL}/api/auth/login?next=/`);
     }
-  }
-
+  };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0b0f1f] px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <img
-            src="/logo.png"
-            alt="Orbit Room"
-            className="h-24 w-24 object-contain drop-shadow-2xl"
-          />
+          <img src="/logo.png" alt="Orbit Room" className="h-24 w-24 object-contain drop-shadow-2xl" />
           <h1 className="font-brand mt-3 bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-indigo-400 bg-clip-text text-3xl font-bold uppercase tracking-[0.1em] text-transparent">
             Orbit Room
           </h1>
@@ -144,29 +117,22 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={startLogin}
-            disabled={checking}
-            className="mt-5 flex w-full items-center justify-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow transition hover:bg-slate-100 disabled:opacity-60"
+          {/* Mudamos para uma div clicável interativa para eliminar qualquer bug de comportamento de <button> ou <form> no mobile */}
+          <div
+            role="button"
+            onClick={handleGoogleLogin}
+            className={`mt-5 flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow transition hover:bg-slate-100 ${checking ? 'opacity-60 pointer-events-none' : ''}`}
           >
             <GoogleG />
             {checking ? 'Verificando...' : 'Entrar com o Google'}
-          </button>
+          </div>
 
           <div className="mt-4 text-center">
-            <Link
-              href="/"
-              className="text-xs text-indigo-300 underline-offset-2 transition hover:underline"
-            >
+            <Link href="/" className="text-xs text-indigo-300 underline-offset-2 transition hover:underline">
               Voltar ao Orbit Room
             </Link>
           </div>
         </div>
-
-        <p className="mt-6 text-center text-[11px] text-slate-600">
-          Seus dados são guardados de forma segura no servidor.
-        </p>
       </div>
     </main>
   )

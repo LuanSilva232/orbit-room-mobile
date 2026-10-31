@@ -4,6 +4,11 @@ const config: CapacitorConfig = {
   appId: 'com.luansilva.orbitroom',
   appName: 'OrbitRoom Mobile',
   webDir: 'out',
+  // ADICIONE ESTA LINHA ABAIXO PARA ENVIAR O USUÁRIO DIRETO PARA A TELA DE LOGIN CORRETA
+  server: {
+    androidScheme: 'https',
+    allowNavigation: ['orbit-room-testing.vercel.app/']
+  },
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
