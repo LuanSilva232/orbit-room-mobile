@@ -5,7 +5,7 @@
   "engines": {
     "node": ">=20"
   },
-    "scripts": {
+  "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -17,8 +17,10 @@
     "cap:open-android": "pnpm cap open android",
     "cap:open-ios": "pnpm cap open ios"
   },
-
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
