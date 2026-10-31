@@ -6,16 +6,7 @@ import { useRouter } from 'next/navigation'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 import { Capacitor } from '@capacitor/core'
 
-const API_URL = 'https://vercel.app'
-
-const ERROR_MESSAGES: Record<string, string> = {
-  GOOGLE_NOT_CONFIGURED: 'O login com Google ainda não foi configurado neste app.',
-  INVALID_STATE: 'Sua solicitação de login expirou. Clique novamente para entrar.',
-  INVALID_CALLBACK: 'A resposta do Google veio incompleta. Tente novamente.',
-  TOKEN_EXCHANGE_FAILED: 'O Google não confirmou seu login. Tente novamente.',
-  INVALID_TOKEN: 'Não foi possível confirmar sua identidade. Tente novamente.',
-  UNVERIFIED_EMAIL: 'Sua conta do Google precisa ter e-mail verificado.',
-}
+const API_URL = 'https://orbit-room-testing.vercel.app/'
 
 function GoogleG() {
   return (
@@ -31,76 +22,64 @@ function GoogleG() {
 export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
-  const [checking, setChecking] = useState(true)
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       GoogleAuth.initialize({
-        clientId: '://googleusercontent.com',
+        // Adicionado o ID completo e correto do seu painel do Google Cloud Console
+        clientId: '832582713946-qil68mecqnbhrfuln0pqghv4u9o98601.apps.googleusercontent.com',
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       })
     }
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    fetch(`${API_URL}/api/auth/me`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!cancelled && d?.user) router.replace('/')
-      })
-      .catch(() => console.log('Não logado'))
-      .finally(() => {
-        if (!cancelled) setChecking(false)
-      })
-    return () => { cancelled = true }
-  }, [router])
-
-  const handleGoogleLogin = async (e: any) => {
-    // INTERCEPTAÇÃO AGRESSIVA DE REFRESH
+const handleGoogleLogin = async (e: any) => {
     if (e) {
-      if (e.preventDefault) e.preventDefault();
-      if (e.stopPropagation) e.stopPropagation();
-      if (e.nativeEvent && e.nativeEvent.stopImmediatePropagation) {
-        e.nativeEvent.stopImmediatePropagation();
-      }
+      e.preventDefault()
+      e.stopPropagation()
     }
 
-    setError(null);
-    console.log('Disparando clique puro no celular');
+    if (Capacitor.isNativePlatform()) {
+      try {
+        setChecking(true)
+        const googleUser = await GoogleAuth.signIn()
+        
+        if (!googleUser?.authentication?.idToken) {
+          setError('INVALID_CALLBACK')
+          return
+        }
 
-    try {
-      const googleUser = await GoogleAuth.signIn();
-      
-      if (!googleUser || !googleUser.authentication.idToken) {
-        setError('INVALID_CALLBACK');
-        return;
+        const response = await fetch(`${API_URL}api/auth/mobile-callback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: googleUser.authentication.idToken }),
+        })
+
+        const data = await response.json()
+        if (data?.user) {
+          localStorage.setItem('user_session', JSON.stringify(data.user))
+          window.location.href = './index.html'
+        } else {
+          setError('TOKEN_EXCHANGE_FAILED')
+        }
+      } catch (err: any) {
+        console.error(err)
+        alert('Erro de autenticação nativa: ' + (err.message || JSON.stringify(err)))
+      } finally {
+        setChecking(false)
       }
-
-      const response = await fetch(`${API_URL}/api/auth/mobile-callback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: googleUser.authentication.idToken }),
-      });
-
-      const data = await response.json();
-      if (data?.user) {
-        window.location.href = '/';
-      } else {
-        setError('TOKEN_EXCHANGE_FAILED');
-      }
-    } catch (err: any) {
-      console.error('Erro no login nativo:', err);
-      alert('Erro na autenticação: ' + (err.message || JSON.stringify(err)));
+    } else {
+      window.location.assign(`${API_URL}api/auth/login?next=/`)
     }
-  };
-
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0b0f1f] px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
+          {/* Corrigida a barra inicial da logo */}
           <img src="/logo.png" alt="Orbit Room" className="h-24 w-24 object-contain drop-shadow-2xl" />
           <h1 className="font-brand mt-3 bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-indigo-400 bg-clip-text text-3xl font-bold uppercase tracking-[0.1em] text-transparent">
             Orbit Room
@@ -110,30 +89,17 @@ export default function LoginPage() {
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl backdrop-blur">
           <h2 className="text-lg font-semibold text-slate-100">Entrar</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Use sua conta do Google. Seu nome, bio, foto e salas ficam salvos na sua conta.
-          </p>
+          <p className="mt-1 text-sm text-slate-400">Use sua conta do Google.</p>
 
-          {error && (
-            <div className="mt-4 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-              {ERROR_MESSAGES[error] || 'Não foi possível entrar. Tente novamente.'}
-            </div>
-          )}
+          {error && <div className="mt-4 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</div>}
 
-                    <div
+          <div
             role="button"
-            onPointerDown={(e) => handleGoogleLogin(e)}
-            className={`mt-5 flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow transition hover:bg-slate-100 ${checking ? 'opacity-60 pointer-events-none' : ''}`}
+            onPointerDown={handleGoogleLogin}
+            className={`mt-5 flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow ${checking ? 'opacity-60 pointer-events-none' : ''}`}
           >
             <GoogleG />
-            {checking ? 'Verificando...' : 'Entrar com o Google'}
-          </div>
-
-
-          <div className="mt-4 text-center">
-            <Link href="/" className="text-xs text-indigo-300 underline-offset-2 transition hover:underline">
-              Voltar ao Orbit Room
-            </Link>
+            {checking ? 'Conectando nativo...' : 'Entrar com o Google'}
           </div>
         </div>
       </div>

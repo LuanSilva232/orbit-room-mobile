@@ -1,12 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export', // Faz o Next.js gerar arquivos HTML/CSS/JS puros para o celular
+  output: 'export',
+  trailingSlash: true, // ⬅️ Garante o mapeamento correto de subpastas/rotas no WebView do celular
   images: {
-    unoptimized: true, // Obrigatório para o modo export do Next.js funcionar no celular
+    unoptimized: true,
   },
   typescript: {
-    ignoreBuildErrors: true, // Garante que o build finalize para os testes iniciais
+    ignoreBuildErrors: true,
   }
 };
 
