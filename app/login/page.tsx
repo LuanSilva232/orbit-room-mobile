@@ -57,17 +57,20 @@ export default function LoginPage() {
     return () => { cancelled = true }
   }, [router])
 
-    const handleGoogleLogin = async (e: any) => {
+  const handleGoogleLogin = async (e: any) => {
+    // INTERCEPTAÇÃO AGRESSIVA DE REFRESH
     if (e) {
-      e.preventDefault();
-      e.stopPropagation();
+      if (e.preventDefault) e.preventDefault();
+      if (e.stopPropagation) e.stopPropagation();
+      if (e.nativeEvent && e.nativeEvent.stopImmediatePropagation) {
+        e.nativeEvent.stopImmediatePropagation();
+      }
     }
 
     setError(null);
-    console.log('Iniciando Login Nativo do Google...');
+    console.log('Disparando clique puro no celular');
 
     try {
-      // Força a chamada do plugin nativo diretamente sem validações de else
       const googleUser = await GoogleAuth.signIn();
       
       if (!googleUser || !googleUser.authentication.idToken) {
@@ -117,14 +120,15 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div
+                    <div
             role="button"
-            onClick={handleGoogleLogin}
+            onPointerDown={(e) => handleGoogleLogin(e)}
             className={`mt-5 flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow transition hover:bg-slate-100 ${checking ? 'opacity-60 pointer-events-none' : ''}`}
           >
             <GoogleG />
             {checking ? 'Verificando...' : 'Entrar com o Google'}
           </div>
+
 
           <div className="mt-4 text-center">
             <Link href="/" className="text-xs text-indigo-300 underline-offset-2 transition hover:underline">
