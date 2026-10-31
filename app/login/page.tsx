@@ -76,17 +76,22 @@ export default function LoginPage() {
       }
   }, [router])
 
-  // Lógica do Clique de Login adaptada para Celular e Web
+    // Lógica do Clique de Login adaptada para Celular e Web
   const startLogin = async () => {
     setError(null)
 
-    if (Capacitor.isNativePlatform()) {
-      // --- MODO CELULAR NATIVO ---
+    // FORÇA O MODO MOBILE SE O NAVEGADOR ESTIVER RODANDO DENTRO DO APP (Sem URL visível)
+    const isMobileApp = Capacitor.isNativePlatform() || 
+                        (typeof window !== 'undefined' && window.location.protocol === 'http:');
+
+    if (isMobileApp) {
+      // --- MODO CELULAR NATIVO FORÇADO ---
       try {
         setChecking(true)
+        console.log('Iniciando Login Nativo do Google...');
         const googleUser = await GoogleAuth.signIn()
         
-        // Envia o token que o celular pegou para validar no seu servidor da Vercel
+        // Envia o token para a sua API oficial na Vercel
         const response = await fetch(`${API_URL}/api/auth/mobile-callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -100,7 +105,7 @@ export default function LoginPage() {
           setError('TOKEN_EXCHANGE_FAILED')
         }
       } catch (err) {
-        console.error(err)
+        console.error('Erro no login nativo:', err)
         setError('INVALID_CALLBACK')
       } finally {
         setChecking(false)
@@ -110,6 +115,7 @@ export default function LoginPage() {
       window.location.assign(`${API_URL}/api/auth/login?next=/`)
     }
   }
+
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0b0f1f] px-4">
