@@ -63,39 +63,33 @@ export default function LoginPage() {
       e.stopPropagation();
     }
 
-    // Armazena no log para monitoramento no Android Studio
-    console.log('Botão pressionado no celular nativo');
+    setError(null);
+    console.log('Iniciando Login Nativo do Google...');
 
-    if (Capacitor.isNativePlatform()) {
-      try {
-        // Removemos o setChecking(true) temporariamente daqui para o Next.js não disparar o refresh de rota!
-        const googleUser = await GoogleAuth.signIn();
-        
-        if (!googleUser || !googleUser.authentication.idToken) {
-          setError('INVALID_CALLBACK');
-          return;
-        }
-
-        const response = await fetch(`${API_URL}/api/auth/mobile-callback`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: googleUser.authentication.idToken }),
-        });
-
-        const data = await response.json();
-        if (data?.user) {
-          // Usa redirecionamento bruto para evitar loops do roteador do Next.js
-          window.location.href = '/';
-        } else {
-          setError('TOKEN_EXCHANGE_FAILED');
-        }
-      } catch (err: any) {
-        console.error('Erro detalhado no login:', err);
-        // Exibe o erro real em um modal nativo do celular
-        alert('Erro na autenticação: ' + (err.message || JSON.stringify(err)));
+    try {
+      // Força a chamada do plugin nativo diretamente sem validações de else
+      const googleUser = await GoogleAuth.signIn();
+      
+      if (!googleUser || !googleUser.authentication.idToken) {
+        setError('INVALID_CALLBACK');
+        return;
       }
-    } else {
-      window.location.assign(`${API_URL}/api/auth/login?next=/`);
+
+      const response = await fetch(`${API_URL}/api/auth/mobile-callback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: googleUser.authentication.idToken }),
+      });
+
+      const data = await response.json();
+      if (data?.user) {
+        window.location.href = '/';
+      } else {
+        setError('TOKEN_EXCHANGE_FAILED');
+      }
+    } catch (err: any) {
+      console.error('Erro no login nativo:', err);
+      alert('Erro na autenticação: ' + (err.message || JSON.stringify(err)));
     }
   };
 
@@ -123,7 +117,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Mudamos para uma div clicável interativa para eliminar qualquer bug de comportamento de <button> ou <form> no mobile */}
           <div
             role="button"
             onClick={handleGoogleLogin}
