@@ -1,7 +1,7 @@
 import './env.js';
 import { expo } from '@better-auth/expo';
 import { betterAuth } from 'better-auth';
-import { Pool } from 'pg';
+import { Pool } from '../node_modules/@types/pg/index.js';
 import { optionalEnv, requiredEnv } from './env.js';
 
 const databaseUrl = requiredEnv('DATABASE_URL');
