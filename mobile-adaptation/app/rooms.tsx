@@ -5,13 +5,16 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
-  View,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import {
+  ThemedText as Text,
+  ThemedTextInput as TextInput,
+  ThemedView as View,
+} from '../components/themed-primitives';
 import { apiRequest } from '../lib/api';
 import { loadGuestProfile } from '../lib/guest-profile';
+import { useResponsiveLayout } from '../lib/responsive-layout';
 
 type Room = {
   id: string;
@@ -33,7 +36,13 @@ type Friend = { id: string; name: string };
 type UserProfile = { name: string; bio: string | null; photo: string | null; cover: string | null };
 
 export default function RoomsScreen() {
-  const params = useLocalSearchParams<{ inviteRoomId?: string }>();
+  const { horizontalPadding, pageMaxWidth } = useResponsiveLayout();
+  const params = useLocalSearchParams<{ inviteRoomId?: string; section?: string }>();
+  const section =
+    typeof params.section === 'string' &&
+    ['private', 'mine', 'create'].includes(params.section)
+      ? params.section
+      : '';
   const highlightedInviteRoomId =
     typeof params.inviteRoomId === 'string' ? params.inviteRoomId : '';
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -221,13 +230,19 @@ export default function RoomsScreen() {
   }
 
   if (!profile) {
+    const signInMessage = /unauthorized|401|faça login/i.test(error)
+      ? 'Entre com o Google para acessar suas salas.'
+      : error || 'Entre com o Google para acessar suas salas.';
     return (
       <View style={styles.centered}>
-        <Text style={styles.error}>{error || 'Entre com o Google para usar salas privadas.'}</Text>
+        <Text style={styles.error}>{signInMessage}</Text>
         <Pressable onPress={() => router.push('/login')} style={styles.button}>
           <Text style={styles.buttonText}>Entrar com Google</Text>
         </Pressable>
-        <Pressable onPress={() => router.back()} style={styles.secondaryButton}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.secondaryButton}
+        >
           <Text style={styles.secondaryText}>Voltar</Text>
         </Pressable>
       </View>
@@ -235,7 +250,13 @@ export default function RoomsScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={[
+        styles.content,
+        { width: '100%', maxWidth: pageMaxWidth, alignSelf: 'center', paddingHorizontal: horizontalPadding },
+      ]}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} style={styles.secondaryButton}>
           <Text style={styles.secondaryText}>Voltar</Text>
@@ -251,11 +272,17 @@ export default function RoomsScreen() {
           <Text style={styles.secondaryText}>Atualizar</Text>
         </Pressable>
       </View>
-      <Text style={styles.eyebrow}>ESPAÇOS PRIVADOS</Text>
-      <Text style={styles.title}>Suas salas</Text>
+      <Text style={styles.eyebrow}>
+        {section === 'mine' ? 'SUAS SALAS' : section === 'create' ? 'NOVA SALA' : 'ESPAÇOS PRIVADOS'}
+      </Text>
+      <Text style={styles.title}>
+        {section === 'mine' ? 'Minhas salas' : section === 'create' ? 'Criar sala' : 'Salas privadas'}
+      </Text>
       {error ? <Text accessibilityRole="alert" style={styles.errorBanner}>{error}</Text> : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
+      {!section || section === 'private' ? (
+      <>
       <Text style={styles.sectionTitle}>Convites recebidos ({invites.length})</Text>
       {highlightedInviteRoomId &&
       invites.some((invite) => invite.roomId === highlightedInviteRoomId) ? (
@@ -341,7 +368,11 @@ export default function RoomsScreen() {
           </View>
         </View>
       ))}
+      </>
+      ) : null}
 
+      {!section || section === 'create' || (section === 'mine' && Boolean(editingRoomId)) ? (
+      <>
       <Text style={styles.sectionTitle}>Criar sala</Text>
       <View style={styles.formCard}>
         <TextInput
@@ -416,7 +447,11 @@ export default function RoomsScreen() {
           </Pressable>
         ) : null}
       </View>
+      </>
+      ) : null}
 
+      {!section || section === 'mine' ? (
+      <>
       <Text style={styles.sectionTitle}>Minhas salas ({rooms.length})</Text>
       {rooms.length === 0 ? <Text style={styles.muted}>Você ainda não criou salas.</Text> : null}
       {rooms.map((room) => (
@@ -485,6 +520,8 @@ export default function RoomsScreen() {
           ) : null}
         </View>
       ))}
+      </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -496,9 +533,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 12,
-    backgroundColor: '#080d1d',
+    backgroundColor: 'transparent',
   },
-  content: { padding: 20, paddingBottom: 48, backgroundColor: '#080d1d', flexGrow: 1 },
+  content: { paddingVertical: 20, paddingBottom: 48, flexGrow: 1 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
   eyebrow: { color: '#a78bfa', fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   title: { color: '#f4f3ff', fontSize: 28, fontWeight: '800', marginTop: 6 },
@@ -506,7 +543,9 @@ const styles = StyleSheet.create({
   formCard: {
     padding: 14,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: 'rgba(13,18,40,0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.18)',
     gap: 10,
   },
   card: {
@@ -516,14 +555,18 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 8,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: 'rgba(13,18,40,0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.18)',
   },
   roomCard: { marginBottom: 6 },
   privateRoomCard: {
     padding: 12,
     marginBottom: 8,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: 'rgba(13,18,40,0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.18)',
     gap: 8,
   },
   privateJoinRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

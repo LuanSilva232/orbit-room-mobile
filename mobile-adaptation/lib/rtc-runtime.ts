@@ -31,6 +31,9 @@ export function createRtcEngine(
     addPeer() {},
     removePeer() {},
     async handleSignal() {},
+    async getSpeakingParticipants() {
+      return [];
+    },
     addLocalStream() {},
     removeLocalStream() {},
     closeAll() {},

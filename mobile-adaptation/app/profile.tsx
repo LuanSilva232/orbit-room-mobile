@@ -6,13 +6,16 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
-  View,
 } from 'react-native';
 import { router } from 'expo-router';
+import {
+  ThemedText as Text,
+  ThemedTextInput as TextInput,
+  ThemedView as View,
+} from '../components/themed-primitives';
 import { apiRequest } from '../lib/api';
-import { clearMobileAuthToken } from '../lib/auth-session';
+import { getAuthClient } from '../lib/auth-client';
+import { useResponsiveLayout } from '../lib/responsive-layout';
 import {
   disablePushNotifications,
   enablePushNotifications,
@@ -32,9 +35,8 @@ type ProfileData = {
   };
 };
 
-type AuthUser = { email: string };
-
 export default function ProfileScreen() {
+  const { horizontalPadding, pageMaxWidth } = useResponsiveLayout();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -52,12 +54,14 @@ export default function ProfileScreen() {
   const [notice, setNotice] = useState('');
 
   const loadProfile = useCallback(async () => {
-    const [account, response, notificationsEnabled] = await Promise.all([
-      apiRequest<{ user: AuthUser }>('/api/auth/me'),
+    const [session, response, notificationsEnabled] = await Promise.all([
+      getAuthClient().getSession(),
       apiRequest<{ profile: ProfileData }>('/api/profile'),
       getPushNotificationsEnabled(),
     ]);
-    setEmail(account.user.email);
+    if (session.error) throw new Error(session.error.message);
+    if (!session.data?.user) throw new Error('Entre com o Google para abrir seu perfil.');
+    setEmail(session.data.user.email);
     setProfile(response.profile);
     setName(response.profile.name);
     setBio(response.profile.bio ?? '');
@@ -124,8 +128,8 @@ export default function ProfileScreen() {
     setError('');
     try {
       await disablePushNotifications();
-      await apiRequest<{ ok: boolean }>('/api/auth/mobile/logout', { method: 'POST' });
-      await clearMobileAuthToken();
+      const result = await getAuthClient().signOut();
+      if (result.error) throw new Error(result.error.message);
       router.replace('/');
     } catch (logoutError) {
       console.error('Não foi possível revogar a sessão no servidor.', logoutError);
@@ -189,7 +193,10 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { width: '100%', maxWidth: pageMaxWidth, alignSelf: 'center', paddingHorizontal: horizontalPadding },
+      ]}
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.topBar}>
@@ -320,9 +327,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 12,
-    backgroundColor: '#080d1d',
+    backgroundColor: 'transparent',
   },
-  content: { padding: 20, paddingBottom: 48, backgroundColor: '#080d1d', flexGrow: 1 },
+  content: { paddingVertical: 20, paddingBottom: 48, flexGrow: 1 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   eyebrow: { color: '#a78bfa', fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 14, marginVertical: 24 },

@@ -20,6 +20,7 @@ export type RtcEngine = {
   addPeer(peerId: string): void;
   removePeer(peerId: string): void;
   handleSignal(peerId: string, kind: RtcSignalKind, data: unknown): Promise<void>;
+  getSpeakingParticipants(): Promise<string[]>;
   addLocalStream(stream: RtcMediaStream): void;
   removeLocalStream(stream: RtcMediaStream): void;
   closeAll(): void;

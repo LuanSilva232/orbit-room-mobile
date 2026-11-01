@@ -1,51 +1,106 @@
 # Orbit Room Mobile
 
-Este aplicativo Expo é a adaptação nativa do website mantido em `../website-original`.
-O código do website não é copiado para dentro do runtime mobile: telas web são
-recriadas com React Native, e o app conversa com o backend HTTP já existente.
+Este aplicativo Expo é um cliente nativo independente. O website original
+permanece em `../website-original`; o app mobile fala com o serviço API-only em
+`api/`, implantado em um app Fly separado.
 
 ## Configuração local
 
-1. Publique primeiro o backend atualizado de `../website-original`, incluindo as
-   rotas `/api/auth/mobile/*` e a aceitação de sessão Bearer. As tabelas da
-   sessão mobile são criadas automaticamente pelo inicializador do banco.
-2. Copie `.env.example` para `.env.local` para manter a configuração local fora
-   do Git.
-3. Troque `EXPO_PUBLIC_API_URL` pela URL HTTPS pública do backend Orbit Room.
-   O app verifica a conexão usando `/api/health` e só habilita a entrada nos
-   canais quando o servidor estiver acessível. Não inclua caminhos, credenciais
-   ou segredos nessa URL.
-4. Instale as dependências com `npm install`.
-5. Inicie o Expo com `npx expo start`.
+1. Configure e publique primeiro o serviço em `api/`. Depois, copie
+   `.env.example` para `.env.local`; `EXPO_PUBLIC_API_URL` e
+   `EXPO_PUBLIC_AUTH_API_URL` devem usar a origem HTTPS do novo app Fly.
+2. Na raiz de `mobile-adaptation`, instale as dependências com `npm install`,
+   rode `npm run build` para exportar Android/iOS ou `npx expo start` para
+   desenvolvimento.
 
-O login Google usa o navegador seguro do sistema, um código temporário protegido
-por PKCE e uma sessão armazenada no SecureStore do aparelho. O backend usa o
-mesmo cadastro e as mesmas sessões do website; não compartilha a senha Google
-com o app. O fluxo mobile atual reutiliza no backend o cliente OAuth do tipo
-**Web application** já usado pelo website, pois o servidor troca e valida o
-código Google com `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`. Clientes OAuth
-Android/iOS criados no Google Cloud não são usados por esse fluxo e não devem
-ter secrets copiados para o aplicativo. O redirect URI autorizado no Google
-continua apontando para `/api/auth/callback` no backend; `orbitroom://auth/callback`
-é apenas o retorno do backend para o app. Como o app usa esse esquema próprio,
-o fluxo OAuth deve ser testado em um development build, não no Expo Go.
+O login Google usa OAuth/PKCE implementado no serviço mobile independente. O
+app guarda o token Bearer no SecureStore e o envia nas chamadas autenticadas;
+nenhuma credencial Google ou URL de banco é embutida no app. O esquema
+`orbitroom://` em `app.json` deve permanecer configurado. O redirect URI do
+Google Cloud é
+`https://orbit-room-mobile-api-rieie-7k4m2.fly.dev/api/auth/callback`.
+Teste o fluxo em um development build, não apenas no Expo Go.
 
-Website e app podem estar em repositórios e interfaces separados, mas precisam
-usar o mesmo backend publicado e o mesmo banco configurado nele para
-compartilhar contas, perfil, salas, mensagens e dados sociais. As chamadas
-usam a mesma sinalização da API; o áudio/vídeo WebRTC é transmitido entre os
-dispositivos e não fica armazenado no backend.
+## Neon
+
+O projeto Neon existente está vinculado à branch `production`; `neon.ts`
+declara Managed Auth e o PostgreSQL é o serviço padrão. `neon deploy` provisiona
+esses serviços e sincroniza as variáveis `DATABASE_URL`,
+`DATABASE_URL_UNPOOLED` e `NEON_AUTH_*` no `.env` local, que não deve ser
+publicado. O backend usa `DATABASE_URL` para as conexões normais e
+`DATABASE_URL_UNPOOLED` para migrações. Nunca coloque essas variáveis em
+`EXPO_PUBLIC_*`.
+
+Durante a transição, a API mobile acessa o Neon existente para preservar os
+dados já usados pelo app e pelo website. As contas e sessões atuais continuam
+no mesmo esquema até uma migração planejada para um banco exclusivo do mobile.
+O fluxo PKCE troca um código de uso único por um token de sessão; as
+credenciais do Google permanecem no servidor.
+
+## API mobile no Fly.io
+
+A API independente fica em `api/`, com suas próprias rotas, imagem Docker e
+`fly.toml`. Ela é implantada no app Fly `orbit-room-mobile-api-rieie-7k4m2`, sem
+substituir o serviço antigo nem publicar a interface do website. Siga
+[`api/README.md`](./api/README.md) para criar o app e configurar secrets. As
+rotas mobile continuam usando o Neon atual temporariamente; a migração de dados
+para um banco exclusivo fica para uma etapa futura.
 
 Visitantes continuam usando um identificador UUID exclusivo do app e um nome
 local salvo com AsyncStorage. Esse perfil não é convertido automaticamente em
-conta Google. Ao entrar com Google, o app usa o perfil remoto da conta.
+conta Google. Ao entrar com Google, o app usa a sessão armazenada no Neon.
 
 A interface nativa usa `StyleSheet` do React Native; estilos CSS do website não
 são carregados no app.
 
-O backend do website continua sendo um serviço Node.js separado. Ele precisa
-estar implantado e configurado com as variáveis privadas do banco de dados e dos
-serviços externos. O aplicativo não deve receber essas credenciais.
+## Interface adaptável
+
+As telas mobile preservam os fluxos nativos e usam a identidade visual do
+website — incluindo a logo original, fundo escuro estrelado com gradientes e
+painéis translúcidos. A navegação inferior segue as quatro categorias do
+website: Início, Chamadas, Chat e Config. Início oferece salas públicas,
+privadas, criação/minhas salas, perfil e atalhos de amigos/configurações.
+Os três canais públicos mostram a ação de entrada e o limite de 10 pessoas,
+igual ao limite validado pelo servidor. Visitantes sem nome salvo entram como
+“Anônimo” por padrão e podem editar esse nome antes de entrar.
+Chamadas mostra um estado de espera até entrar em um canal; depois exibe
+participantes, controles e chat. Chat reúne as conversas e a área de amigos.
+Config lista as subcategorias de conta/comunidade, áudio/vídeo,
+aparência/comportamento e sistema, encaminhando cada fluxo aos recursos
+mobile existentes quando disponíveis.
+
+As telas Sobre e Atualizações reproduzem em português a descrição, os créditos e
+as notas completas das versões v0.65, v0.6, v0.5, v0.4 e v0.3 do website. O
+fundo nativo usa a mesma base escura e as mesmas cores de gradiente e estrelas;
+recursos exclusivos do website continuam identificados como indisponíveis no
+app, em vez de aparecerem como controles sem ação.
+
+O modo silencioso é salvo no aparelho e faz novas entradas começarem com o
+microfone desligado. O volume das vozes recebidas pode ser ajustado em
+Configurações → Áudio e vídeo e é aplicado também durante chamadas ativas.
+O volume geral do aparelho continua controlado pelos botões físicos. A câmera
+frontal ou traseira pode ser definida para a próxima captura. Privacidade e
+notificações têm controles nativos; privacidade é sincronizada com o perfil e
+notificações push de mensagens, convites e solicitações exigem login, projeto
+EAS e permissões do aparelho. Alertas de entrada/saída de participantes do
+website ainda não foram portados.
+
+O website inclui ainda solicitação de exclusão de conta, tema claro, idioma
+inglês, filtros de vídeo e ferramentas administrativas. Essas funções não são
+simuladas no app: exclusão de conta e administração continuam apenas no website;
+tema claro, inglês e filtros de vídeo não foram portados. A limpeza mobile
+restaura preferências locais e permite apagar o perfil visitante, sem apagar
+dados do servidor. O processamento nativo do microfone e as notificações do
+sistema seguem as capacidades do Android/iOS.
+
+A orientação padrão permite retrato e paisagem. Os layouts recalculam dimensões
+ao girar ou redimensionar: o conteúdo fica centralizado e limitado em telas
+largas, e o canal ativo coloca controles/participantes ao lado do chat quando
+há espaço horizontal. Em telefones estreitos, o canal mantém uma composição
+vertical e rolável.
+
+O serviço mobile e o website têm deploys independentes. Enquanto a API mobile
+usa o Neon existente, ambos continuam interoperando com os mesmos dados.
 
 O acompanhamento das etapas e pendências está em
 [`../PENDENCIAS-MOBILE.md`](../PENDENCIAS-MOBILE.md), na raiz do repositório.

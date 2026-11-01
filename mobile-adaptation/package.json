@@ -4,11 +4,15 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^15.0.2",
+    "@neon/config": "^1.10.0",
+    "@neon/env": "^1.6.8",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~58.0.22",
     "expo-constants": "~58.0.14",
     "expo-crypto": "~58.0.7",
+    "expo-linear-gradient": "~58.0.3",
     "expo-linking": "~58.0.15",
+    "expo-network": "~58.0.4",
     "expo-notifications": "~58.1.7",
     "expo-router": "~58.0.29",
     "expo-secure-store": "~58.0.2",
@@ -32,6 +36,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "build": "expo export --platform android --platform ios",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",

@@ -1,8 +1,11 @@
 # Pendências da adaptação mobile
 
 Este checklist segue a divisão de 11 etapas definida para o projeto. A interface
-mobile e o backend Node.js permanecem separados; o app usa as mesmas contas,
-dados e salas do website por meio da API.
+mobile e o backend Node.js permanecem separados. O backend Fly.io em
+`mobile-adaptation/backend` já possui Better Auth com o plugin Expo e acesso ao
+Neon, mas ainda não foi publicado e atualmente só fornece autenticação,
+`/health` e `/api/me`. As APIs de perfil, salas, mensagens, social, push e WebRTC
+precisam ser migradas antes que os recursos do app funcionem com esse backend.
 
 ## Status
 
@@ -16,18 +19,22 @@ dados e salas do website por meio da API.
 
 ### Etapa 1 — Base do app e conexão com a API
 
-**Status: Implementada; URL local configurada; deploy mobile pendente.**
+**Status: App e backend Neon/Fly.io publicados; login Google e migração de APIs pendentes.**
 
 - Estrutura Expo/React Native e telas mobile ficam em `mobile-adaptation`;
-  website e backend Node.js ficam em `website-original`.
+  `website-original` é apenas a referência do website.
 - O app verifica a API e valida a origem configurada.
 - `EXPO_PUBLIC_API_URL` foi configurada localmente em
   `mobile-adaptation/.env.local` como `https://orbit-room-testing.vercel.app`;
   na última verificação, `/api/health` respondeu 200, mas
   `/api/auth/mobile/login` continua respondendo 404.
-- **Falta:** publicar o app/build com essa variável no ambiente de build e
-  confirmar chamadas autenticadas e acesso ao banco pelo app. O `.env.local`
-  local não deve ser commitado.
+- O backend Fly.io usa Neon, aplica as tabelas Better Auth por migração e expõe
+  health check. A implantação foi validada com Postgres conectado e as rotas
+  de sessão/proteção.
+- `EXPO_PUBLIC_AUTH_API_URL` direciona Better Auth ao Fly.io, enquanto
+  `EXPO_PUBLIC_API_URL` continua atendendo as APIs existentes do website.
+- **Falta:** configurar Google OAuth e migrar os demais endpoints. O `.env.local`
+  e as URLs privadas não devem ser commitados ou incluídos no APK.
 
 ### Etapa 2 — Entrada como visitante
 
@@ -54,23 +61,18 @@ dados e salas do website por meio da API.
 - **Falta:** validar mensagens e atualização entre website e app com a API
   publicada, inclusive perda temporária de conexão.
 
-### Etapa 5 — Login Google e conta compartilhada
+### Etapa 5 — Login Google e conta
 
-**Status: Implementada no app; OAuth real bloqueado pelo backend publicado.**
+**Status: Cliente Expo e servidor Better Auth publicados; OAuth real pendente de credenciais Google.**
 
-- O app usa navegador seguro, PKCE e sessão mobile própria; a conta e a
-  autenticação continuam no backend compartilhado.
-- O fluxo atual reutiliza o cliente OAuth **Web application** do backend do
-  website. Clientes OAuth Android/iOS não são consumidos pelo fluxo existente.
-  O Google redireciona para `/api/auth/callback`; `orbitroom://auth/callback`
-  apenas retorna do backend ao app.
-- O redirect URI informado para o website (`https://orbit-room-testing.vercel.app/api/auth/callback`)
-  foi confirmado como igual ao URI autorizado no Google Cloud.
-- **Bloqueio confirmado:** `https://orbit-room-testing.vercel.app/api/auth/mobile/login`
-  retorna 404 na implantação atual; publique o backend atualizado de
-  `website-original` antes de testar o login mobile.
-- **Falta:** validar o retorno OAuth e a revogação de sessão com domínio HTTPS e
-  credenciais Google de produção em aparelhos Android e iOS.
+- O app usa `@better-auth/expo`, navegador seguro e cookies protegidos pelo
+  SecureStore. O backend separado usa tabelas Better Auth no Postgres Neon.
+- A conta mobile é independente da conta do website até uma migração explícita.
+- O Managed Neon Auth continua provisionado, mas não é usado pelo app.
+- **Falta:** adicionar as credenciais Google ao ambiente privado do servidor,
+  cadastrar
+  `<BETTER_AUTH_URL>/api/auth/callback/google` no Google Cloud e testar login,
+  sessão e logout em development builds Android e iOS.
 
 ### Administração
 
@@ -157,25 +159,23 @@ dados e salas do website por meio da API.
 
 ## Pendências finais — ordem sugerida
 
-1. Publicar `website-original` com as rotas de autenticação mobile, sessões,
-   tokens push e envio de notificações; confirmar o banco de produção. O endpoint
-   `/api/auth/mobile/login` da URL configurada atualmente retorna 404.
-   Administração permanece exclusiva do website e deve ser validada no
-   repositório real do backend, caso necessário; nenhuma integração admin mobile
-   está planejada.
-2. Configurar `EXPO_PUBLIC_API_URL` também no ambiente EAS usado para os builds;
-   a URL local já está em `mobile-adaptation/.env.local`. Configurar o projeto
-   EAS/ID e credenciais push nas respectivas plataformas, sem incluir segredos
-   do backend no app.
-3. Executar cenários de conta, perfil, salas, social, chat e notificações com duas
+1. Configurar OAuth Google no Fly.io e testar o login com
+   `EXPO_PUBLIC_AUTH_API_URL`; não apontar o app inteiro para esse backend
+   enquanto faltarem as APIs de dados.
+2. Migrar as rotas de perfil, salas, social, chat, RTC e push para o backend que
+   usará o Neon; depois configurar `EXPO_PUBLIC_API_URL` nos builds EAS e testar
+   sincronização real.
+3. Configurar o projeto EAS/ID e credenciais push nas respectivas plataformas,
+   sem incluir segredos no app. Administração permanece exclusiva do website.
+4. Executar cenários de conta, perfil, salas, social, chat e notificações com duas
    contas reais, alternando website e app.
-4. Gerar development builds e testar voz/vídeo em aparelhos Android e iOS;
+5. Gerar development builds e testar voz/vídeo em aparelhos Android e iOS;
    testar compartilhamento de tela Android.
-5. Configurar um servidor TURN antes de homologar chamadas em redes restritas.
-6. Decidir se compartilhamento de tela iOS e chamadas de voz em segundo plano
+6. Configurar um servidor TURN antes de homologar chamadas em redes restritas.
+7. Decidir se compartilhamento de tela iOS e chamadas de voz em segundo plano
    são requisitos desta versão; se sim, implementar as extensões/serviços nativos
    e repetir os testes.
-7. Rodar lint, TypeScript, Expo Doctor, testes do backend e exportações/builds
+8. Rodar lint, TypeScript, Expo Doctor, testes do backend e exportações/builds
    após a configuração real.
 
 ## Validações locais já realizadas
@@ -196,13 +196,21 @@ dados e salas do website por meio da API.
   `glob`/`minimatch` na cadeia Expo. A correção sugerida por `npm audit fix
   --force` rebaixaria o Expo para SDK 51; não foi aplicada para evitar uma
   alteração incompatível de SDK.
-- O projeto mobile não tem script nem arquivos de testes automatizados próprios.
+- O projeto mobile não tem testes automatizados próprios.
 - A API publicada respondeu 200 em `/api/health`, mas 404 em
   `/api/auth/mobile/login`; login Google, perfil autenticado e recursos sociais
   não podem ser homologados até a publicação do backend atualizado.
 - Não foram feitos testes de chamadas, push ou OAuth em aparelhos reais. iOS,
   push e integração com duas contas ainda dependem de builds, credenciais e
   backend funcionais.
+- Validação atual: `npm run lint`, `npx tsc --noEmit` e `npm run build` do app
+  passaram; o build exportou bundles Android e iOS. Build/typecheck do backend
+  passaram, a migração informou que o esquema Neon já está atualizado e os
+  testes locais retornaram `/health` 200, sessão anônima 200 e `/api/me` 401.
+- Deploy Fly.io v4 concluído; release da migração passou e a URL pública
+  retornou `/health` 200 com Neon conectado, sessão anônima 200 e `/api/me` 401.
+- OAuth Google real ainda não foi testado (`googleOAuthConfigured=false`).
+  Faltam configurar credenciais Google e validar o login em development builds.
 
 ## Bloqueios para gerar e distribuir APK
 

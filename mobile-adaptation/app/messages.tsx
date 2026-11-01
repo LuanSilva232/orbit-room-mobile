@@ -6,12 +6,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
-  View,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import {
+  ThemedText as Text,
+  ThemedTextInput as TextInput,
+  ThemedView as View,
+} from '../components/themed-primitives';
 import { apiRequest } from '../lib/api';
+import { openActiveChannelChat } from '../lib/active-channel';
+import { useResponsiveLayout } from '../lib/responsive-layout';
 
 type Peer = { id: string; name: string; photo: string | null };
 type Conversation = {
@@ -29,15 +33,22 @@ type Message = { id: string; fromMe: boolean; text: string; time: number };
 type Friend = { id: string; name: string };
 
 export default function MessagesScreen() {
+  const { horizontalPadding, pageMaxWidth } = useResponsiveLayout();
   const params = useLocalSearchParams<{
     userId?: string;
     userName?: string;
     conversationId?: string;
+    category?: string;
   }>();
   const initialUserId = typeof params.userId === 'string' ? params.userId : '';
   const initialUserName = typeof params.userName === 'string' ? params.userName : '';
   const initialConversationId =
     typeof params.conversationId === 'string' ? params.conversationId : '';
+  const category =
+    typeof params.category === 'string' &&
+    ['conversations', 'received', 'sent', 'friends'].includes(params.category)
+      ? params.category
+      : '';
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [sentRequests, setSentRequests] = useState<PendingConversation[]>([]);
   const [receivedRequests, setReceivedRequests] = useState<PendingConversation[]>([]);
@@ -131,6 +142,14 @@ export default function MessagesScreen() {
   }, [loadMessages, selectedConversation]);
 
   const selectedPeer = selectedConversation?.peer ?? selectedFriend;
+  const handleBack = () => {
+    if (selectedPeer) {
+      setSelectedConversation(null);
+      setSelectedFriend(null);
+      setMessages([]);
+    }
+    router.back();
+  };
   const sendRequest = async () => {
     if (!selectedFriend || !draft.trim()) return;
     setBusy(true);
@@ -212,7 +231,7 @@ export default function MessagesScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={handleBack} style={styles.backButton}>
           <Text style={styles.backText}>Voltar</Text>
         </Pressable>
         <Text style={styles.title}>Mensagens</Text>
@@ -221,84 +240,152 @@ export default function MessagesScreen() {
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-      <ScrollView style={styles.inbox} contentContainerStyle={styles.inboxContent}>
+      <ScrollView
+        style={styles.inbox}
+        contentContainerStyle={[
+          styles.inboxContent,
+          { width: '100%', maxWidth: pageMaxWidth, alignSelf: 'center', paddingHorizontal: horizontalPadding },
+        ]}
+      >
+        <View style={styles.chatSwitcher}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={openActiveChannelChat}
+            style={styles.chatSwitch}
+          >
+            <Text style={styles.chatSwitchText}>🎧 Canal</Text>
+          </Pressable>
+          <View style={[styles.chatSwitch, styles.chatSwitchSelected]}>
+            <Text style={styles.chatSwitchSelectedText}>💬 Conversas</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.navigate('/social')}
+            style={styles.chatSwitch}
+          >
+            <Text style={styles.chatSwitchText}>🤝 Amigos</Text>
+          </Pressable>
+        </View>
         {!selectedPeer ? (
           <>
-            <Text style={styles.sectionTitle}>Conversas</Text>
-            {conversations.map((conversation) => (
-              <Pressable
-                key={conversation.id}
-                onPress={() => {
-                  setSelectedConversation(conversation);
-                  setSelectedFriend(null);
-                  setMessages([]);
-                }}
-                style={styles.listItem}
-              >
-                <View style={styles.listText}>
-                  <Text style={styles.itemTitle}>{conversation.peer.name}</Text>
-                  <Text numberOfLines={1} style={styles.muted}>
-                    {conversation.lastMessage?.text ?? 'Comece uma conversa'}
+            {category ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => router.back()}
+                  style={styles.returnToInbox}
+                >
+                  <Text style={styles.secondaryText}>‹ Conversas</Text>
+                </Pressable>
+                <View style={styles.conversationsHeading}>
+                  <Text style={styles.conversationsTitle}>
+                    {category === 'conversations' ? 'Conversas de amigos'
+                      : category === 'received' ? 'Solicitações recebidas'
+                        : category === 'sent' ? 'Solicitações enviadas'
+                          : 'Iniciar conversa com amigo'}
                   </Text>
                 </View>
-                {conversation.unread > 0 ? <Text style={styles.badge}>{conversation.unread}</Text> : null}
-              </Pressable>
-            ))}
-
-            <Text style={styles.sectionTitle}>Solicitações recebidas</Text>
-            {receivedRequests.map((request) => (
-              <View key={request.id} style={styles.requestItem}>
-                <View style={styles.listText}>
-                  <Text style={styles.itemTitle}>{request.peer.name}</Text>
-                  <Text numberOfLines={1} style={styles.muted}>{request.lastMessage?.text}</Text>
+                {category === 'conversations' ? (
+                  conversations.length ? conversations.map((conversation) => (
+                    <Pressable
+                      key={conversation.id}
+                      onPress={() => {
+                        setSelectedConversation(conversation);
+                        setSelectedFriend(null);
+                        setMessages([]);
+                      }}
+                      style={styles.listItem}
+                    >
+                      <View style={styles.listText}>
+                        <Text style={styles.itemTitle}>{conversation.peer.name}</Text>
+                        <Text numberOfLines={1} style={styles.muted}>
+                          {conversation.lastMessage?.text ?? 'Comece uma conversa'}
+                        </Text>
+                      </View>
+                      {conversation.unread > 0 ? <Text style={styles.badge}>{conversation.unread}</Text> : null}
+                    </Pressable>
+                  )) : <Text style={styles.muted}>Conversas aceitas com amigos aparecerão aqui.</Text>
+                ) : null}
+                {category === 'received' ? (
+                  receivedRequests.length ? receivedRequests.map((request) => (
+                    <View key={request.id} style={styles.requestItem}>
+                      <View style={styles.listText}>
+                        <Text style={styles.itemTitle}>{request.peer.name}</Text>
+                        <Text numberOfLines={1} style={styles.muted}>{request.lastMessage?.text}</Text>
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={busy}
+                        onPress={() => void respondToRequest(request.id, 'accept')}
+                        style={styles.actionButton}
+                      >
+                        <Text style={styles.actionText}>Aceitar</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={busy}
+                        onPress={() => void respondToRequest(request.id, 'decline')}
+                        style={styles.rejectButton}
+                      >
+                        <Text style={styles.rejectText}>Recusar</Text>
+                      </Pressable>
+                    </View>
+                  )) : <Text style={styles.muted}>Nenhuma solicitação recebida.</Text>
+                ) : null}
+                {category === 'sent' ? (
+                  sentRequests.length ? sentRequests.map((request) => (
+                    <View key={request.id} style={styles.listItem}>
+                      <View style={styles.listText}>
+                        <Text style={styles.itemTitle}>{request.peer.name}</Text>
+                        <Text style={styles.muted}>Aguardando resposta</Text>
+                      </View>
+                    </View>
+                  )) : <Text style={styles.muted}>Nenhuma solicitação enviada.</Text>
+                ) : null}
+                {category === 'friends' ? (
+                  friends.length ? friends.map((friend) => (
+                    <Pressable
+                      key={friend.id}
+                      onPress={() => {
+                        setSelectedFriend(friend);
+                        setSelectedConversation(null);
+                        setMessages([]);
+                      }}
+                      style={styles.listItem}
+                    >
+                      <Text style={styles.itemTitle}>{friend.name}</Text>
+                      <Text style={styles.secondaryText}>Mensagem</Text>
+                    </Pressable>
+                  )) : <Text style={styles.muted}>Adicione amigos para iniciar uma conversa.</Text>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <View style={styles.conversationsHeading}>
+                  <Text style={styles.conversationsTitle}>Conversas</Text>
+                  <Text style={styles.muted}>Seus chats, solicitações e amigos em seções separadas.</Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={busy}
-                  onPress={() => void respondToRequest(request.id, 'accept')}
-                  style={styles.actionButton}
-                >
-                  <Text style={styles.actionText}>Aceitar</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={busy}
-                  onPress={() => void respondToRequest(request.id, 'decline')}
-                  style={styles.rejectButton}
-                >
-                  <Text style={styles.rejectText}>Recusar</Text>
-                </Pressable>
-              </View>
-            ))}
-
-            <Text style={styles.sectionTitle}>Solicitações enviadas</Text>
-            {sentRequests.map((request) => (
-              <View key={request.id} style={styles.listItem}>
-                <View style={styles.listText}>
-                  <Text style={styles.itemTitle}>{request.peer.name}</Text>
-                  <Text style={styles.muted}>Aguardando resposta</Text>
-                </View>
-              </View>
-            ))}
-
-            <Text style={styles.sectionTitle}>Iniciar conversa com amigo</Text>
-            {friends.map((friend) => (
-              <Pressable
-                key={friend.id}
-                onPress={() => {
-                  setSelectedFriend(friend);
-                  setSelectedConversation(null);
-                  setMessages([]);
-                }}
-                style={styles.listItem}
-              >
-                <Text style={styles.itemTitle}>{friend.name}</Text>
-                <Text style={styles.secondaryText}>Mensagem</Text>
-              </Pressable>
-            ))}
-            {!conversations.length && !receivedRequests.length && !friends.length ? (
-              <Text style={styles.muted}>Adicione amigos para começar uma conversa.</Text>
-            ) : null}
+                {([
+                  ['conversations', 'Conversas de amigos', `${conversations.length} ativas`],
+                  ['received', 'Solicitações recebidas', `${receivedRequests.length} pendentes`],
+                  ['sent', 'Solicitações enviadas', `${sentRequests.length} aguardando`],
+                  ['friends', 'Iniciar conversa com amigo', `${friends.length} amigos`],
+                ] as const).map(([id, title, count]) => (
+                  <Pressable
+                    key={id}
+                    accessibilityRole="button"
+                    onPress={() => router.push({ pathname: '/messages', params: { category: id } })}
+                    style={styles.categoryCard}
+                  >
+                    <View style={styles.accordionHeadingCopy}>
+                      <Text style={styles.accordionTitle}>{title}</Text>
+                      <Text style={styles.accordionCount}>{count}</Text>
+                    </View>
+                    <Text style={styles.accordionChevron}>›</Text>
+                  </Pressable>
+                ))}
+              </>
+            )}
           </>
         ) : (
           <>
@@ -307,6 +394,7 @@ export default function MessagesScreen() {
                 setSelectedConversation(null);
                 setSelectedFriend(null);
                 setMessages([]);
+                if (category) router.back();
               }}
               style={styles.returnToInbox}
             >
@@ -359,8 +447,8 @@ export default function MessagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#080d1d' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#080d1d' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   header: {
     minHeight: 58,
     flexDirection: 'row',
@@ -375,6 +463,62 @@ const styles = StyleSheet.create({
   title: { color: '#f4f3ff', fontSize: 17, fontWeight: '800' },
   inbox: { flex: 1 },
   inboxContent: { padding: 16, paddingBottom: 32, gap: 8 },
+  chatSwitcher: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 5,
+    borderRadius: 14,
+    backgroundColor: 'rgba(4,8,20,0.42)',
+  },
+  chatSwitch: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  chatSwitchSelected: { backgroundColor: 'rgba(99,102,241,0.25)' },
+  chatSwitchText: { color: '#8992ab', fontSize: 12, fontWeight: '700' },
+  chatSwitchSelectedText: { color: '#c4b5fd', fontSize: 12, fontWeight: '800' },
+  conversationsHeading: { alignItems: 'center', paddingTop: 16, paddingBottom: 8 },
+  conversationsTitle: { color: '#f4f3ff', fontSize: 21, fontWeight: '800', textAlign: 'center' },
+  accordionCard: {
+    overflow: 'hidden',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.2)',
+    backgroundColor: 'rgba(13,18,40,0.7)',
+  },
+  categoryCard: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.2)',
+    backgroundColor: 'rgba(13,18,40,0.7)',
+  },
+  accordionHeader: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  accordionHeadingCopy: { flex: 1, gap: 4 },
+  accordionTitle: { color: '#e5e7f2', fontSize: 13, fontWeight: '800' },
+  accordionCount: { color: '#8992ab', fontSize: 11 },
+  accordionChevron: { color: '#c4b5fd', fontSize: 22, fontWeight: '600' },
+  accordionContent: {
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148,163,184,0.15)',
+  },
   sectionTitle: { color: '#f4f3ff', fontSize: 16, fontWeight: '800', marginTop: 16, marginBottom: 4 },
   listItem: {
     minHeight: 58,
@@ -382,7 +526,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: 'rgba(13,18,40,0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.18)',
     gap: 8,
   },
   requestItem: {
@@ -391,7 +537,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: 'rgba(13,18,40,0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.18)',
     gap: 6,
   },
   listText: { flex: 1 },

@@ -5,12 +5,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
-  View,
 } from 'react-native';
 import { router } from 'expo-router';
+import {
+  ThemedText as Text,
+  ThemedTextInput as TextInput,
+  ThemedView as View,
+} from '../components/themed-primitives';
 import { apiRequest } from '../lib/api';
+import { openActiveChannelChat } from '../lib/active-channel';
+import { useResponsiveLayout } from '../lib/responsive-layout';
 
 type Friend = {
   id: string;
@@ -42,6 +46,7 @@ type SocialData = {
 };
 
 export default function SocialScreen() {
+  const { horizontalPadding, pageMaxWidth } = useResponsiveLayout();
   const [data, setData] = useState<SocialData | null>(null);
   const [friendCode, setFriendCode] = useState('');
   const [loading, setLoading] = useState(true);
@@ -127,7 +132,13 @@ export default function SocialScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={[
+        styles.content,
+        { width: '100%', maxWidth: pageMaxWidth, alignSelf: 'center', paddingHorizontal: horizontalPadding },
+      ]}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} style={styles.secondaryButton}>
           <Text style={styles.secondaryText}>Voltar</Text>
@@ -142,6 +153,25 @@ export default function SocialScreen() {
         >
           <Text style={styles.secondaryText}>Atualizar</Text>
         </Pressable>
+      </View>
+      <View style={styles.chatSwitcher}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={openActiveChannelChat}
+          style={styles.chatSwitch}
+        >
+          <Text style={styles.chatSwitchText}>🎧 Canal</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.navigate('/messages')}
+          style={styles.chatSwitch}
+        >
+          <Text style={styles.chatSwitchText}>💬 Conversas</Text>
+        </Pressable>
+        <View style={[styles.chatSwitch, styles.chatSwitchSelected]}>
+          <Text style={styles.chatSwitchSelectedText}>🤝 Amigos</Text>
+        </View>
       </View>
       <Text style={styles.eyebrow}>COMUNIDADE</Text>
       <Text style={styles.title}>Amigos</Text>
@@ -277,10 +307,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 12,
-    backgroundColor: '#080d1d',
+    backgroundColor: 'transparent',
   },
-  content: { padding: 20, paddingBottom: 48, backgroundColor: '#080d1d', flexGrow: 1 },
+  content: { paddingVertical: 20, paddingBottom: 48, flexGrow: 1 },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
+  chatSwitcher: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 5,
+    borderRadius: 14,
+    backgroundColor: 'rgba(4,8,20,0.42)',
+  },
+  chatSwitch: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  chatSwitchSelected: { backgroundColor: 'rgba(217,70,239,0.2)' },
+  chatSwitchText: { color: '#8992ab', fontSize: 12, fontWeight: '700' },
+  chatSwitchSelectedText: { color: '#f0abfc', fontSize: 12, fontWeight: '800' },
   eyebrow: { color: '#a78bfa', fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   title: { color: '#f4f3ff', fontSize: 28, fontWeight: '800', marginTop: 6 },
   subtitle: { color: '#8992ab', fontSize: 12, marginTop: 6, lineHeight: 18 },
@@ -290,7 +337,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(167,139,250,0.28)',
-    backgroundColor: 'rgba(99,102,241,0.1)',
+    backgroundColor: 'rgba(13,18,40,0.82)',
   },
   sectionTitle: { color: '#f4f3ff', fontSize: 16, fontWeight: '800', marginTop: 24, marginBottom: 10 },
   code: { color: '#c4b5fd', fontSize: 24, fontWeight: '900', letterSpacing: 3, marginVertical: 8 },
@@ -315,7 +362,9 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 8,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: 'rgba(13,18,40,0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.18)',
   },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#252d45' },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },

@@ -1,56 +1,8 @@
-import { getMobileAuthToken } from './auth-session';
+import { Platform } from 'react-native';
+import { getApiConfiguration } from './api-config';
+import { getMobileAuthToken } from './auth-client';
 
-export type ApiConfiguration = {
-  baseUrl: string | null;
-  error: string | null;
-};
-
-function resolveApiConfiguration(value: string | undefined): ApiConfiguration {
-  const configuredUrl = value?.trim();
-
-  if (!configuredUrl) {
-    return {
-      baseUrl: null,
-      error: 'Configure EXPO_PUBLIC_API_URL no arquivo .env da pasta mobile-adaptation.',
-    };
-  }
-
-  let url: URL;
-  try {
-    url = new URL(configuredUrl);
-  } catch {
-    return { baseUrl: null, error: 'A URL da API não é válida.' };
-  }
-
-  const localHosts = new Set(['localhost', '127.0.0.1', '[::1]', '10.0.2.2']);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && localHosts.has(url.hostname))) {
-    return {
-      baseUrl: null,
-      error: 'Use uma URL HTTPS para o servidor da API.',
-    };
-  }
-
-  if (
-    url.username ||
-    url.password ||
-    url.pathname !== '/' ||
-    url.search ||
-    url.hash
-  ) {
-    return {
-      baseUrl: null,
-      error: 'Informe somente a URL principal do servidor, sem caminho ou credenciais.',
-    };
-  }
-
-  return { baseUrl: url.origin, error: null };
-}
-
-const apiConfiguration = resolveApiConfiguration(process.env.EXPO_PUBLIC_API_URL);
-
-export function getApiConfiguration(): ApiConfiguration {
-  return apiConfiguration;
-}
+export { getApiConfiguration } from './api-config';
 
 function describeError(payload: unknown, fallback: string) {
   if (typeof payload !== 'object' || payload === null) return fallback;
@@ -81,7 +33,7 @@ export async function apiRequest<T>(
   const headers = new Headers(options.headers);
   if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  if (!headers.has('Authorization')) {
+  if (!headers.has('Authorization') && Platform.OS !== 'web') {
     const token = await getMobileAuthToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);
   }
@@ -90,6 +42,7 @@ export async function apiRequest<T>(
   try {
     response = await fetch(`${baseUrl}${path}`, {
       ...options,
+      credentials: options.credentials ?? 'include',
       headers,
     });
   } catch (error) {

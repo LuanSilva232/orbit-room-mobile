@@ -10,6 +10,7 @@ import type {
   RtcEngineEvents,
   RtcMediaStream,
   RtcSignalKind,
+  RtcTrack,
   RtcVideoViewProps,
 } from './rtc-runtime.types';
 
@@ -18,6 +19,7 @@ export type {
   RtcEngineEvents,
   RtcMediaStream,
   RtcSignalKind,
+  RtcTrack,
   RtcVideoViewProps,
 } from './rtc-runtime.types';
 
@@ -215,6 +217,41 @@ class NativeRtcEngine implements RtcEngine {
         }
       }
     }
+  }
+
+  async getSpeakingParticipants(): Promise<string[]> {
+    const speaking = new Set<string>();
+
+    await Promise.all(
+      Array.from(this.peers.entries()).map(async ([peerId, peer]) => {
+        try {
+          const report: unknown = await peer.connection.getStats();
+          if (!(report instanceof Map)) return;
+
+          let remoteAudioLevel = 0;
+          let localAudioLevel = 0;
+          for (const value of report.values()) {
+            if (!isRecord(value)) continue;
+            const isAudio = value.kind === 'audio' || value.mediaType === 'audio';
+            const level = typeof value.audioLevel === 'number' ? value.audioLevel : 0;
+            if (!isAudio) continue;
+
+            if (value.type === 'inbound-rtp') {
+              remoteAudioLevel = Math.max(remoteAudioLevel, level);
+            } else if (value.type === 'outbound-rtp') {
+              localAudioLevel = Math.max(localAudioLevel, level);
+            }
+          }
+
+          if (remoteAudioLevel > 0.04) speaking.add(peerId);
+          if (localAudioLevel > 0.04) speaking.add(this.clientId);
+        } catch {
+          // A peer may close while its audio statistics are being collected.
+        }
+      })
+    );
+
+    return [...speaking];
   }
 
   addLocalStream(stream: RtcMediaStream): void {
